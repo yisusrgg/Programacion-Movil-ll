@@ -127,7 +127,7 @@ fun MainScreen(routeViewModel: RouteViewModel = viewModel()) {
             shape = MaterialTheme.shapes.medium,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 20.dp)
+                .padding(top = 50.dp)
         ) {
             Text(
                 text = "Mantén presionado el mapa para fijar tu casa",
@@ -155,12 +155,20 @@ fun MapViewCompose(
             controller.setZoom(15.0)
         }
     }
+    var firstLocationFix by remember { mutableStateOf(true) }
 
     AndroidView(
         factory = { mapView },
         modifier = Modifier.fillMaxSize(),
         update = { view ->
             view.overlays.clear()
+
+            currentLocation?.let {
+                if (firstLocationFix) {
+                    view.controller.setCenter(it)
+                    firstLocationFix = false
+                }
+            }
 
             // Eventos del mapa (Long Click para cambiar destino)
             val eventsReceiver = object : MapEventsReceiver {
