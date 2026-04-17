@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FCM Server - Enviar Notificaciones</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: #16213e;
+      padding: 40px;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 500px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    h1 { color: #f5a623; margin-bottom: 8px; }
+    p.sub { color: #aaa; margin-bottom: 28px; font-size: 14px; }
+    label { display: block; margin-bottom: 6px; font-size: 14px; color: #ccc; }
+    input, textarea {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #333;
+      background: #0f3460;
+      color: #fff;
+      margin-bottom: 18px;
+      font-size: 14px;
+    }
+    textarea { height: 80px; resize: vertical; }
+    button {
+      width: 100%;
+      padding: 14px;
+      background: #f5a623;
+      color: #1a1a2e;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.85; }
+    #result {
+      margin-top: 20px;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      display: none;
+    }
+    .success { background: #1b5e20; color: #a5d6a7; }
+    .error   { background: #b71c1c; color: #ef9a9a; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>🔔 FCM Push Server</h1>
+  <p class="sub">Envía notificaciones push a dispositivos Android</p>
+
+  <label>Token del dispositivo</label>
+  <input id="token" type="text" placeholder="Pega aquí el token FCM del dispositivo"/>
+
+  <label>Título</label>
+  <input id="title" type="text" placeholder="Ej: Alerta importante"/>
+
+  <label>Mensaje</label>
+  <textarea id="body" placeholder="Escribe el contenido del mensaje..."></textarea>
+
+  <button onclick="sendNotification()">📤 Enviar notificación</button>
+
+  <div id="result"></div>
+</div>
+
+<script>
+  async function sendNotification() {
+    const token = document.getElementById('token').value.trim();
+    const title = document.getElementById('title').value.trim();
+    const body  = document.getElementById('body').value.trim();
+    const result = document.getElementById('result');
+
+    if (!token || !title || !body) {
+      showResult('Por favor completa todos los campos.', false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, title, body })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        showResult(`✅ Mensaje enviado correctamente.\nID: ${data.messageId}`, true);
+      } else {
+        showResult(`❌ Error: ${data.error}`, false);
+      }
+    } catch (e) {
+      showResult(`❌ Error de red: ${e.message}`, false);
+    }
+  }
+
+  function showResult(msg, success) {
+    const el = document.getElementById('result');
+    el.textContent = msg;
+    el.className = success ? 'success' : 'error';
+    el.style.display = 'block';
+  }
+</script>
+</body>
+</html>
