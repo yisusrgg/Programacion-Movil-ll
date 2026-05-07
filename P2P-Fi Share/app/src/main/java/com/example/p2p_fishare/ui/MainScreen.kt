@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +29,7 @@ fun MainScreen(
     onDiscoverClick: () -> Unit,
     onConnectClick: (WifiP2pDevice) -> Unit,
     onSendMessage: (String) -> Unit,
+    onSendFileClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var textToSend by remember { mutableStateOf("") }
@@ -89,7 +91,6 @@ fun MainScreen(
                 ) {
                     items(messages) { msg ->
                         val isMe = msg.startsWith("Yo:")
-                        // Limpiamos el prefijo para mostrar solo el contenido en la burbuja
                         val displayMsg = msg.removePrefix("Yo: ").removePrefix("Recibido: ")
                         ChatBubble(message = displayMsg, isMe = isMe)
                     }
@@ -103,6 +104,21 @@ fun MainScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    IconButton(
+                        onClick = onSendFileClick,
+                        modifier = Modifier
+                            .background(
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                shape = CircleShape
+                            )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Enviar archivo",
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+
                     TextField(
                         value = textToSend,
                         onValueChange = { textToSend = it },

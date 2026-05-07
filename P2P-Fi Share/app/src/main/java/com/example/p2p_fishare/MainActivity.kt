@@ -1,46 +1,35 @@
 package com.example.p2p_fishare
 
 import android.Manifest
-import android.content.Context
-import android.content.IntentFilter
-import android.content.pm.PackageManager
-import android.net.wifi.p2p.WifiP2pManager
+elimiimport android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
-import com.example.p2p_fishare.receivers.WiFiDirectBroadcastReceiver
 import com.example.p2p_fishare.ui.MainScreen
 import com.example.p2p_fishare.ui.theme.P2PFiShareTheme
-import com.example.p2p_fishare.viewmodels.WiFiDirectViewModel
+import com.example.p2p_fishare.viewmodels.WifiAwareViewModel
 
 class MainActivity : ComponentActivity() {
 
-    private val manager by lazy { getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager }
-    private var channel: WifiP2pManager.Channel? = null
-    private var receiver: WiFiDirectBroadcastReceiver? = null
-    private val viewModel: WiFiDirectViewModel by viewModels()
-
-    private val intentFilter = IntentFilter().apply {
-        addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
-        addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
-        addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
-        addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION)
-    }
+    private val viewModel: WifiAwareViewModel by viewModels()
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         if (permissions.all { it.value }) {
-            channel?.let { viewModel.startDiscovery(manager, it) }
+            viewModel.startAwareSession(this)
         }
     }
 
@@ -48,34 +37,50 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        channel = manager.initialize(this, mainLooper, null)
-        receiver = channel?.let { WiFiDirectBroadcastReceiver(manager, it, viewModel) }
-
         setContent {
             P2PFiShareTheme {
-                // Configuramos el Scaffold para que no añada insets automáticos
-                // y así evitar que el chat "flote" cuando se abre el teclado
+                val filePickerLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.GetContent()
+                ) { uri ->
+                    uri?.let { viewModel.sendFile(contentResolver, it) }
+                }
+
+                LaunchedEffect(Unit) {
+                    viewModel.checkSupport(this@MainActivity)
+                    checkPermissionsAndStart()
+                }
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     contentWindowInsets = WindowInsets(0, 0, 0, 0)
                 ) { innerPadding ->
-                    // Pasamos el modifier directamente sin el padding del Scaffold
                     MainScreen(
-                        peers = viewModel.peersList,
+                        peers = emptyList(),
                         isConnected = viewModel.isConnected,
                         status = viewModel.connectionStatus,
                         messages = viewModel.chatMessages,
-                        onDiscoverClick = { checkPermissionsAndDiscover() },
-                        onConnectClick = { device -> channel?.let { viewModel.connectToDevice(manager, it, device) } },
+                        onDiscoverClick = { checkPermissionsAndStart() },
+                        onConnectClick = { /* Wi-Fi Aware logic */ },
                         onSendMessage = { message -> viewModel.sendMessage(message) },
-                        modifier = Modifier.fillMaxSize()
+                        onSendFileClick = { filePickerLauncher.launch("*/*") },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
                     )
+
+                    if (!viewModel.isConnected) {
+                        val peers = viewModel.discoveredPeers.value
+                        if (peers.isNotEmpty()) {
+                            val firstPeer = peers.keys.first()
+                            viewModel.connectToPeer(firstPeer)
+                        }
+                    }
                 }
             }
         }
     }
 
-    private fun checkPermissionsAndDiscover() {
+    private fun checkPermissionsAndStart() {
         val permissions = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
@@ -86,19 +91,9 @@ class MainActivity : ComponentActivity() {
         }
 
         if (missing.isEmpty()) {
-            channel?.let { viewModel.startDiscovery(manager, it) }
+            viewModel.startAwareSession(this)
         } else {
             requestPermissionLauncher.launch(missing.toTypedArray())
         }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        receiver?.let { registerReceiver(it, intentFilter) }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        receiver?.let { unregisterReceiver(it) }
     }
 }

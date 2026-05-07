@@ -20,6 +20,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.annotation.RequiresPermission
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -74,13 +75,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+
+    @RequiresPermission(Manifest.permission.ACCESS_NETWORK_STATE)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        
-        wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-        connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
+
+        //Obtiene el WifiManager, que es el "control remoto" de la antena Wi-Fi para iniciar escaneos.
+        wifiManager = applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
+
+        //Obtiene el ConnectivityManager, que es el supervisor que nos dirá si internet está activo o no.
+        connectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+
+        // Llama a la función que vigila la conexión actual.
         setupNetworkCallback()
 
         setContent {
@@ -95,6 +103,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @RequiresPermission(Manifest.permission.ACCESS_NETWORK_STATE)
     private fun setupNetworkCallback() {
         val networkRequest = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -102,12 +111,15 @@ class MainActivity : ComponentActivity() {
             .build()
 
         connectivityManager.registerNetworkCallback(networkRequest, object : ConnectivityManager.NetworkCallback() {
+
+            //Si te conectas a un Wi-Fi, esta línea se activa automáticamente, cambia el estado a true y extrae el nombre (SSID) de la red actual
             override fun onAvailable(network: Network) {
                 viewModel.isConnected = true
                 val wifiInfo = wifiManager.connectionInfo
                 viewModel.activeNetworkName = wifiInfo.ssid.replace("\"", "")
             }
 
+            //Si apagas el Wi-Fi o te alejas, detecta la pérdida y actualiza la UI a "Desconectado"
             override fun onLost(network: Network) {
                 viewModel.isConnected = false
                 viewModel.activeNetworkName = "Desconectado"
@@ -115,6 +127,7 @@ class MainActivity : ComponentActivity() {
         })
     }
 
+    // Registra el wifiScanReceiver justo cuando la app entra en primer plano (onResume).
     override fun onResume() {
         super.onResume()
         val intentFilter = IntentFilter()
@@ -122,6 +135,7 @@ class MainActivity : ComponentActivity() {
         registerReceiver(wifiScanReceiver, intentFilter)
     }
 
+    //Lo apaga cuando sales de la app (onPause) para no gastar batería innecesariamente.
     override fun onPause() {
         super.onPause()
         unregisterReceiver(wifiScanReceiver)
@@ -131,17 +145,20 @@ class MainActivity : ComponentActivity() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return
         }
-        
+
+        //Aquí es donde la antena del celular envía señales al aire para encontrar routers
         wifiManager.startScan()
     }
 
+    //Una vez que el sistema termina el escaneo, el Receiver (Línea 71) llama a updateResults.
     private fun scanSuccess() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
-        
+
         val results = wifiManager.scanResults
         updateResults(results)
     }
 
+    //Una vez que el sistema termina el escaneo, el Receiver (Línea 71) llama a updateResults.
     private fun scanFailure() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
         
